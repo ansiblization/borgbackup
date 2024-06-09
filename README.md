@@ -1,5 +1,7 @@
 # Ansible role for installing scheduled borgbackup jobs
 
+This role depends on the [ansiblization/syslog](https://github.com/ansiblization/syslog) role for logging capabilities.
+
 The borgbackup jobs to be scheduled have to be defined as a list named `borgbackup_jobs`:
 
 ```yml
