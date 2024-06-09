@@ -1,0 +1,7 @@
+{% include 'common/templates/header.j2' %}
+{% if borgbackup_vars.exclude %}
+
+{% for borgbackup_exclude in borgbackup_vars.exclude %}
+{{ borgbackup_exclude }}
+{% endfor %}
+{% endif %}

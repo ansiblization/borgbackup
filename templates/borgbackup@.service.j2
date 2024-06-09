@@ -1,0 +1,22 @@
+{% include 'common/templates/header.j2' %}
+
+[Unit]
+Description=Ansible borgbackup job (%i)
+
+[Service]
+Type=exec
+User=root
+StandardError=syslog
+StandardOutput=syslog
+SyslogIdentifier=ansible-borgbackup-%i
+EnvironmentFile=/etc/ansible-borgbackup/%i.env
+ExecStartPre=-/usr/bin/borg init --make-parent-dirs --encryption "${BORG_ENCRYPTION}" "${BORG_REPOSITORY}"
+ExecStartPre=/usr/bin/xargs -r -a /etc/ansible-borgbackup/%i.conflicts /usr/bin/systemctl stop
+ExecStart=/usr/bin/xargs -r -a /etc/ansible-borgbackup/%i.args /usr/bin/borg create {{ borgbackup_options }} {{ borgbackup_options_verbose }} --compression "${BORG_COMPRESSION}" --exclude-from "/etc/ansible-borgbackup/%i.exclude" "${BORG_REPOSITORY}::${BORG_ARCHIVE_FORMAT}"
+ExecStopPost=/usr/bin/borg prune --list --stats --glob-archives '*' --keep-daily "${BORG_KEEP_DAILY}" --keep-weekly "${BORG_KEEP_WEEKLY}" --keep-monthly "${BORG_KEEP_MONTHLY}" "${BORG_REPOSITORY}"
+ExecStopPost=/usr/bin/borg compact "${BORG_REPOSITORY}"
+ExecStopPost=/usr/bin/xargs -r -a /etc/ansible-borgbackup/%i.conflicts /usr/bin/systemctl start
+TimeoutStopSec={{ borgbackup_conflicts_timeout }}
+
+[Install]
+WantedBy=multi-user.target

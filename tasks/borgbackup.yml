@@ -1,0 +1,87 @@
+---
+
+- name: Assert valid borgbackup configuration
+  ansible.builtin.assert:
+    that:
+      - borgbackup_job.name is defined
+      - borgbackup_job.repository is defined
+      - borgbackup_job.paths is defined
+      - borgbackup_job.paths | length > 0
+
+- name: Resolve borgbackup job variables
+  ansible.builtin.set_fact:
+    borgbackup_vars:
+      name: "{{ borgbackup_job.name }}"
+      paths: "{{ borgbackup_job.paths }}"
+      repository: "{{ borgbackup_job.repository }}"
+      exclude: "{{ borgbackup_job.exclude | default([]) }}"
+      archive_format: "{{ borgbackup_job.archive_format | default('{now}') }}"
+      encryption: "{{ borgbackup_job.encryption | default('none') }}"
+      passphrase: "{{ borgbackup_job.passphrase | default(None) }}"
+      compression: "{{ borgbackup_job.compression | default('zstd') }}"
+      schedule: "{{ borgbackup_job.schedule | default(None) }}"
+      conflicts: "{{ borgbackup_job.conflicts | default([]) }}"
+      state: "{{ borgbackup_job.state | default('present') }}"
+      keep_daily: "{{ borgbackup_job.keep_daily | default(7) }}"
+      keep_weekly: "{{ borgbackup_job.keep_weekly | default(4) }}"
+      keep_monthly: "{{ borgbackup_job.keep_monthly | default(6) }}"
+
+- name: Assert supported compression mode
+  ansible.builtin.assert:
+    that:
+      - borgbackup_vars.compression in
+          ['none', 'lz4', 'zlib', 'lzma', 'zstd']
+    msg: "Unsupported compression mode: {{ borgbackup_vars.compression }}"
+
+- name: Assert supported borgbackup encryption mode
+  ansible.builtin.assert:
+    that:
+      - borgbackup_vars.encryption in ['none',
+          'authenticated', 'authenticated-blake2',
+          'repokey', 'keyfile', 'repokey-blake2',
+          'keyfile-blake2']
+    msg: "Unsupported encryption mode: {{ borgbackup_vars.encryption }}"
+
+- name: Ensure borgbackup job configuration files
+  ansible.builtin.template:
+    src: "borgbackup.{{ borgbackup_configuration_type }}.j2"
+    dest: "/etc/ansible-borgbackup/{{ borgbackup_vars.name
+      }}.{{ borgbackup_configuration_type }}"
+    mode: "0o600"
+  loop_control:
+    loop_var: borgbackup_configuration_type
+  loop: ["env", "args", "exclude", "conflicts"]
+  when: borgbackup_vars.state == "present"
+
+- name: Prune absent job configuration files
+  ansible.builtin.file:
+    dest: "/etc/ansible-borgbackup/{{ borgbackup_vars.name
+      }}.{{ borgbackup_configuration_type }}"
+    state: absent
+  loop_control:
+    loop_var: borgbackup_configuration_type
+  loop: ["env", "args", "exclude", "conflicts"]
+  when: borgbackup_vars.state == 'absent'
+
+- name: Ensure schedule state
+  ansible.builtin.set_fact:
+    borgbackup_job_scheduled: "{{ borgbackup_vars.schedule and
+      borgbackup_vars.state == 'present' }}"
+
+- name: Ensure borgbackup timer unit
+  ansible.builtin.template:
+    src: "borgbackup.timer.j2"
+    dest: "/etc/systemd/system/ansible-borgbackup-{{ borgbackup_vars.name }}.timer"
+    mode: "0o644"
+  when: borgbackup_job_scheduled
+  notify: Enable borgbackup timer
+
+- name: Ensure absent borgbackup timer unit
+  ansible.builtin.file:
+    path: "/etc/systemd/system/ansible-borgbackup-{{ borgbackup_vars.name }}.timer"
+    state: absent
+  when: not borgbackup_job_scheduled
+  notify: Daemon reload
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers

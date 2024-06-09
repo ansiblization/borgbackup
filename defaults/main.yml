@@ -1,0 +1,6 @@
+---
+
+borgbackup_jobs: []
+borgbackup_options: --one-file-system --exclude-caches
+borgbackup_options_verbose: --list --stats --verbose --show-rc --show-version
+borgbackup_conflicts_timeout: 600

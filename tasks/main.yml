@@ -1,0 +1,32 @@
+---
+
+- name: Ensure borgbackup
+  ansible.builtin.package:
+    name: borgbackup
+    state: present
+
+- name: Ensure borgbackup configuration directory
+  ansible.builtin.file:
+    path: /etc/ansible-borgbackup
+    state: directory
+    mode: "0o700"
+
+- name: Ensure borgbackup service unit
+  ansible.builtin.template:
+    src: "borgbackup@.service.j2"
+    dest: "/etc/systemd/system/ansible-borgbackup@.service"
+    mode: "0o644"
+  notify: Daemon reload
+
+- name: Ensure syslog configuration
+  ansible.builtin.template:
+    src: borgbackup-syslog.conf.j2
+    dest: /etc/syslog-ng/conf.d/ansible-borgbackup.conf
+    mode: "0o644"
+  notify: Restart syslog
+
+- name: "Include borgbackup tasks"
+  ansible.builtin.include_tasks: "borgbackup.yml"
+  loop_control:
+    loop_var: borgbackup_job
+  loop: "{{ borgbackup_jobs }}"

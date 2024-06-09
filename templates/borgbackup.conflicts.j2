@@ -1,0 +1,5 @@
+{% if borgbackup_vars.conflicts %}
+{% for borgbackup_conflict in borgbackup_vars.conflicts %}
+{{ borgbackup_conflict }}
+{% endfor %}
+{% endif %}
