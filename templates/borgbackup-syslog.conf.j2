@@ -5,7 +5,7 @@ filter f_borgbackup {
 };
 
 destination d_borgbackup {
-    file("/var/log/borgbackup/${PROGRAM}.log" create_dirs(yes));
+    file("/var/log/ansible-borgbackup/${PROGRAM}.log" create_dirs(yes));
 };
 
 log {
